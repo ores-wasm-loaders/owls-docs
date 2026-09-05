@@ -1,5 +1,14 @@
+.ores/
+.zed/
+.registry/
+zed_modules/
+node_modules/
+.env
+.env.*
+.DS_Store
+
 # Repository-local temporary data and authorized Git worktrees
-tmp
-temp
-tmp/worktrees
-temp/worktrees
+tmp/
+temp/
+tmp/worktrees/
+temp/worktrees/
