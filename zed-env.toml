@@ -1,0 +1,7 @@
+schema = 2
+[tasks.check]
+run = ["zed validate --require-lock", "bash -n scripts/registry.sh"]
+[tasks.registry]
+description = "Download and verify the immutable preview registry"
+run = ["bash scripts/registry.sh"]
+
