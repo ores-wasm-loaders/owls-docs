@@ -1,0 +1,9 @@
+.ores/
+.zed/
+.registry/
+zed_modules/
+node_modules/
+.env
+.env.*
+.DS_Store
+

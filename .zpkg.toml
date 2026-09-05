@@ -1,0 +1,17 @@
+[package]
+org = "ores-wasm-loaders"
+name = "owls-docs"
+version = "0.1.1"
+description = "WASM host architecture, reproducible installation and product extension guides"
+license = "MIT"
+[package.repository]
+vcs = "git"
+url = "https://github.com/ores-wasm-loaders/owls-docs"
+[targets.repository]
+dir = "."
+[install]
+adapter = "none"
+[publish]
+include_readme = true
+exclude = [".ores/**", ".zed/**", ".registry/**", "zed_modules/**", "node_modules/**"]
+
