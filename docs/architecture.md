@@ -1,59 +1,152 @@
-# Architecture and runtime boundaries
+# Architecture
 
-OWLS separates five responsibilities: the release contract, preparation policy, byte transport/storage, framework activation, and view lifetime. An organization injects its policy and adapters while sharing the coordinator. There is no singleton spanning every domain or native process.
+## The question this org answers
 
-```mermaid
-flowchart LR
-  Build[Actual framework build] --> Manifest[Immutable release manifest]
-  Manifest --> Host[Organization host and policy]
-  Host --> Bytes[Bounded fetch and verified byte store]
-  Host --> Activate[Explicit activation adapter]
-  Bytes --> Activate
-  Activate --> Glue[Generated glue or native engine]
-  Glue --> Views[Retained engine and removable views]
+We run marketing sites for 35+ GitHub orgs. Behind them sit real applications: Flutter web
+builds, and Leptos/Dioxus islands and route bundles compiled to WebAssembly. The marketing
+page is cheap; the application is not. So: can the marketing page get the application ready,
+so that arriving at it costs nothing?
+
+Partly, and the part that works is worth building once for the whole fleet. The part that
+does not work is worth stating plainly, because designing around a false version of it is
+how a "loading layer" turns into a page that silently boots the app for visitors who never
+asked for it.
+
+## What can actually be reused, and what cannot
+
+| What you prepare | What a later page gets |
+| --- | --- |
+| Downloaded responses (JS, `.wasm`, fonts, renderer assets) | May be reused from an eligible browser cache. Partitioned by top-level site. |
+| Compiled WebAssembly code | The browser *may* reuse its own compilation cache. Policy-dependent, not a portable guarantee. |
+| An evaluated JS module and its initialized objects | Available within the same document. Not inherited by a new document. |
+| A running Flutter engine or hydrated Rust app, with state | Stays alive only while the document does. A normal navigation does not hand it over. |
+
+Two objects that are easy to conflate: a `WebAssembly.Module` is compiled code; a
+`WebAssembly.Instance` has execution state. Preparation can sometimes produce the first. Only
+activation produces the second, and only in the document that will use it.
+
+So the goal is **"avoid redundant downloads and initialization"**, not "never run a bootstrap
+again". Where a live runtime genuinely matters, the answer is a persistent shell — one
+document that starts as marketing content and later reveals the app — not a claim that
+navigation carries a runtime along.
+
+## Origins matter more than orgs
+
+Browser HTTP caches are partitioned by top-level site. Putting every org's loader on one CDN
+therefore does **not** mean a visitor downloads it once for all 35 orgs; separate
+`*.github.io` sites are separate sites for this purpose. A shared CDN is still worth having —
+one release layout, one set of headers, one place to fix a content type — it just is not a
+universal cache.
+
+Within one product:
+
+```
+https://product.example/                          marketing (HTML-first)
+https://product.example/app/                      the application
+https://product.example/assets/releases/<id>/     immutable release assets
 ```
 
-## Contract
+Same origin, same asset URLs, one manifest: this is the layout where preparation pays off.
+Same-site subdomains (`www.` → `app.`) are cross-origin: they share no JS objects and no
+running engine, and their asset reuse depends on the actual requests.
 
-`owls-interfaces` contains the JSON Schema and TypeSpec peer definitions plus TypeScript, Rust and Dart shapes. JSON Schema is the runtime validation authority; the TypeSpec model describes the same shape without claiming every JSON constraint is encoded as a TypeSpec decorator. No implementation is hidden in the contract package. Dart includes serialization helpers and immutable owned values.
+Security boundaries come first. Do not merge an admin application and a marketing site
+carrying third-party scripts into one origin to save a few hundred milliseconds.
 
-Each release has a schemaVersion, appId, immutable release ID, runtime, entrypoint asset ID, assets, and optional extensions. Each asset names its exact canonical HTTPS URL, decoded byte length, SHA-256, kind, and preparation eligibility. The hosts also reject duplicate URLs/IDs, unknown entrypoints, forbidden origins and mismatched runtime/entrypoint kinds. Unknown public fields fail validation; tenant additions belong under extensions.
+## The two verbs
 
-`owls-runtime::inspect_build` derives sizes/hashes from real build files. It refuses symlinks and guessed entrypoints. Feed its JSON through the public validator and publish it with that exact build. Never guess Flutter filenames or combine bootstrap, engine and application outputs from different releases.
+Everything in this org is organized around keeping these apart:
 
-## Preparation and activation
+```
+prepare(appId)              fetch-only, bounded, cancellable, no side effects.
+                            No script insertion, no dynamic import of an entrypoint,
+                            no auth, no subscriptions, no writes.
+                            Failing is a non-event.
 
-Preparation fetches approved assets within byte and concurrency limits. It never imports JavaScript, invokes a bootstrap, starts WASM, hydrates an island, or mounts a Flutter view. Optional early compilation is explicit for raw WASM. Failed speculative fetching does not poison a later demand fetch.
+activate(appId, { host })   start or reuse the application in THIS document,
+                            using whatever preparation left behind — and working
+                            correctly when none did.
+```
 
-Demand activation uses one stable adapter object per immutable release and retained host. Successful activation is shared. TypeScript and Dart remember failed activation too: an adapter may already have changed the document or initialized a runtime. A deadline rejects the caller and signals cancellation; it cannot forcibly undo a non-cooperative callback. Application cleanup or document replacement must precede a deliberate restart.
+`owls-web-loader` enforces this structurally rather than by convention: preparation runs with
+a frozen capability object containing `fetch`, an `AbortSignal`, a log function and — only
+when the release's policy and the runtime both allow it — a narrow `compileStreaming`. There
+is no document in it, so an adapter's prepare path cannot insert a script even by mistake.
+A test in that repo also scans this org's source and fails the build if a prepare path so
+much as mentions `import(`, `eval`, or `createElement('script')`.
 
-Custom transports and stores must honor cancellation, bound their own allocations and complete their operations. The built-in fetch transports enforce streaming bounds. A native Rust blocking read observes cancellation between reads and is also bounded by its HTTP timeout.
+## The pieces
 
-## Runtime matrix
+| Component | Responsibility |
+| --- | --- |
+| `owls-interfaces` | The vocabulary: the release contract as JSON Schema and TypeSpec peers, the invariants a schema cannot state, and the preparation order every host shares. |
+| `owls-web-loader` | Scheduling and lifecycle in the browser: registry, budgets, integrity, de-duplication, cancellation, intent policy, hints and telemetry — plus the adapters, because activation is where frameworks differ. |
+| `owls-runtime.rs` | The native host (Wasmi, explicit capabilities, fuel and memory limits) and build-output inspection: generating a release manifest from what a build actually emitted, and verifying one against the tree it claims to describe. |
+| `owls-flutter` | The Dart host and the WebView bridge. |
+| `owls-e2e` (test org) | Real framework consumers, the five entry paths measured in bytes-after-click, hosting checks, and adapter conformance.
 
-| Environment | Shipped behavior | Required application ownership |
-|---|---|---|
-| Browser or Web Worker, raw WASM | Fetch, verify, optionally compile, instantiate with explicit imports | Imports, worker messaging and release lifecycle |
-| Browser, wasm-bindgen | Exact generated glue receives verified module bytes | Build-owned glue import and application start function |
-| Leptos browser client | Pinned hydration hook through the bindgen adapter | SSR markup, matching build and island selection |
-| Dioxus browser client | Caller-supplied launch hook | Router, generated split assets and renderer lifecycle |
-| Flutter web / embedded Flutter | Generated custom bootstrap, official loader lifecycle, one engine with multiple views | Build config, renderer asset URLs and document ownership |
-| Rust server or native desktop | Verified bytes, persistent file cache, fuel/memory-limited Wasmi raw module execution | Explicit host imports; GUI remains native, no WebView required |
-| Dart/Flutter mobile or desktop | Shared host, HTTP/file stores, injected native adapter | Chosen WASM engine/FFI binding and platform packaging |
-| Flutter WebView host | Fixed registered-release bridge, request IDs and completion replies | Navigation policy, JavaScript setup, platform WebView and permissions |
-| TypeScript server / SSR | DOM-free Link header helpers and portable coordination | Framework rendering and asset serving |
+The 80–90% sharing target lives in the first two rows plus the tooling: coordination,
+validation, release handling, telemetry and policy. It is explicitly **not** a claim that
+80–90% of application bytes, memory, or framework internals are shared.
 
-Wasmi is not a Flutter WasmGC host and does not execute a browser's wasm-bindgen DOM glue. A browser executable and a native library need different adapters, even if built from related Rust source. The Dart package intentionally does not pretend a universal native WASM engine exists.
+## Why two adapters and not one
 
-## Storage scope
+Flutter and Rust/Wasm do not share a loading contract:
 
-Memory retains bytes only for its host lifetime. CacheStorage is origin/namespace scoped, optional and evictable. A service worker controls only its eligible clients/scope; this package does not register one automatically. HTTP caching depends on request compatibility, partitioning, credentials and response headers. A marketing-site prefetch is a best-effort hint, especially before navigation to another origin.
+* A Flutter web release boots through its own generated bootstrap, which owns renderer
+  selection, the WasmGC-versus-JS-fallback decision, and engine initialization. Its Wasm is
+  WasmGC; its startup is Dart's.
+* A Rust release is a `wasm-bindgen` module plus JS glue generated for *that module's*
+  imports and exports. The glue belongs to the release.
 
-A retained same-document host can preserve a compiled module or engine. Full navigation normally destroys it. Native file caches are separate from WebView HTTP caches. A server cache does not populate the user's browser. File stores bound entries; the application owns total disk quota and eviction. Use private application cache directories.
+Nothing useful is shared below the lifecycle level, and pretending otherwise produces import
+mismatches at instantiation. What *is* shared is everything above it: when to prepare, how
+much, how to cancel, which release is current, what to do when it changes, and how to report
+what happened. That is the coordinator.
 
-## Integrity and trust
+Within Rust, Leptos and Dioxus differ only in the last step — hydrate the islands, or mount
+the route — so they are two small hooks over one shared lifecycle, not two loaders.
 
-Hash validation protects assets read through the coordinator. A subsequent dynamic import has a separate trust path: the host must pin generated glue and its transitive imports using immutable deployment URLs, CSP, and supported import-map integrity. Flutter bootstrap loading uses script integrity, but framework subresources still require a trusted, internally consistent build and delivery configuration.
+## Release identity
 
-Default HTTP transports disallow redirects and public-asset credentials. Origin allowlists are exact, canonical origins, never suffix matches. Private authenticated bundles need an explicit transport policy and must not enter shared public caches. Extension hooks do not weaken those defaults.
+A release is immutable and addressed by id:
 
+```
+/assets/releases/2026.09.05-a1b2c3d/the release manifest (`release-v2`)
+```
+
+The manifest is generated from the emitted build graph by `owls-runtime.rs` — never
+hand-written from conventional filenames — and carries entrypoint roles, digests, sizes, the
+preparation budget and the activation mode.
+
+Mixing releases is refused. If a new release is published between preparation and the click,
+the coordinator discards the stale preparation, emits `activate:stale-preparation`, and
+activates the current release from cold. Slower, and correct; the alternative is an old
+bootstrap meeting a new module.
+
+## What a marketing page does
+
+1. Serve its own content. Load the coordinator and the page's own interaction code, nothing
+   else.
+2. On intent — hover or focus of "Open app", a pointer-down, or a trigger that stays on
+   screen on touch — prepare *that one* destination, within its declared budget.
+3. On click, activate. If preparation happened, the bytes are local. If it did not, was
+   cancelled, or was evicted, activation still works.
+
+Prerendering the destination page (Speculation Rules) is a legitimate alternative for
+"ready when we arrive" — it prepares the destination's own document rather than pretending a
+runtime can be handed over. `owls-web-loader` can emit the rule; it is an enhancement, never
+a dependency of the click path.
+
+## MASH is not a Wasm stack
+
+The maud/axum/htmx pages that most of our Rust web servers render are HTML with HTMX
+interactions. They need no Wasm loader. Only their Wasm islands do. Server and ORM code is
+never shipped to a browser to make the loading model look uniform.
+
+## Related
+
+- [Prefetch and activation strategies](prefetch-and-activation.md)
+- [Pilot plan](pilot-plan.md)
+- [Adoption guides](adoption/)
+- [Decisions](decisions/)
