@@ -10,7 +10,7 @@ A reusable preparation and activation layer for TypeScript, Rust and Flutter/Dar
 | [owls-flutter](https://github.com/ores-wasm-loaders/owls-flutter) | Dart host, native stores and trusted WebView bridge |
 | [owls-e2e](https://github.com/ores-wasm-loaders-test/owls-e2e) | External Zed consumers and real framework browser fixtures |
 
-Start with [reproducible installation](docs/installation.md), then read [architecture and runtime boundaries](docs/architecture.md), [preloading guidance](docs/preloading.md), and [validation and current limits](docs/validation.md).
+Start with [reproducible installation](docs/installation.md), then read [architecture and runtime boundaries](docs/architecture.md) and the [component reference](docs/components.md). [Preparation and activation strategies](docs/strategies.md) covers which strategy a surface should run and what each one actually buys; [preloading guidance](docs/preloading.md) covers the underlying browser mechanisms. Adopting this in a product starts with the [pilot plan](docs/pilot-plan.md). [Validation and current limits](docs/validation.md) states what has and has not been exercised.
 
 The [v0.1.1 release](https://github.com/ores-wasm-loaders/owls-docs/releases/tag/v0.1.1) carries the checksum-pinned registry snapshot. This preview works despite the public Zed registry outage and can be adopted by other organizations through normal Zed manifests and locks.
 
