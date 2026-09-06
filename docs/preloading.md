@@ -2,6 +2,8 @@
 
 Start with a static marketing shell or SSR HTML. Add intent preparation on hover/focus and cancellable idle preparation only when the user has not enabled data saving and the connection is suitable. The library defaults to an 8 MiB speculative budget, 64 MiB maximum individual demand asset and a 30-second deadline; tune policy per product and device class.
 
+Use the explicit lifecycle rule: preparation is optional and activation is reliable demand startup. The browser helper waits 150 ms of pointer/focus dwell, keeps a lease for 150 ms after pointer exit, starts immediately for touch/pointer-down, and releases unclaimed work when the document is hidden or enters `pagehide`. Activation joins a speculative job for at most 50 ms by default, then proceeds with its own demand signal. A `warmed`, `failed`, `cancelled` or policy-`skipped` preparation outcome is telemetry—not a reason to block or fail a click.
+
 ## Select the appropriate mechanism
 
 | Tool | Good use | Limit |
@@ -32,6 +34,8 @@ A Flutter app can prefetch through its Dart host into its private file cache whi
 
 A WebView has its own document/cache lifecycle. Register a fixed release and adapter in the trusted document; send only the bridge's allowlisted operation and release key. A reply means the asynchronous operation finished, not merely that JavaScript was queued. Attach the bridge only to a trusted document, enforce navigation decisions, and dispose it during teardown. Do not expose arbitrary URLs, evaluation, native filesystem paths or engine imports through it.
 
+When preparation fails, keep the HTML/static shell and let activation retry through the normal verified demand path. If activation itself fails or times out, show a retry/help affordance and retain the fallback; do not silently replay the same adapter owner because framework startup may have partially changed the document. Deactivate the retained owner or replace the document before a deliberate restart.
+
 ## Measure before promising a speedup
 
 Record cold navigation, warm navigation, retained-document activation and process restart separately. Measure bytes requested, bytes reused, activation duration, time to first useful view, memory high-water mark and cancellation. Include data-saving and slow-network runs. The supplied tests prove lifecycle and request reuse, not an 80–90% performance improvement.
@@ -45,4 +49,3 @@ Record cold navigation, warm navigation, retained-document activation and proces
 - [MDN preload](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/preload)
 - [MDN prefetch](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/prefetch)
 - [Wasmi](https://docs.rs/wasmi/0.46.0/wasmi/)
-

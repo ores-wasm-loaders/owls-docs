@@ -4,9 +4,9 @@ Preview v0.1.1 is source-reviewed, locally tested, and distributed through immut
 
 ## Automated coverage
 
-- TypeScript: 15 unit/contract tests, including preparation/activation separation, integrity, streaming limits, cancellation, deadline, deduplication, generated-glue ownership, cache bounds and immutable extensions.
-- Rust: 8 package tests for actual build inspection, verified native execution, fuel/memory limits, cancellation, bad manifests and persistent file cache.
-- Flutter/Dart: 9 package tests plus static analysis, including embedded schema equality, integer-valued JSON numbers, immutable extensions, activation deadline and file-cache restart.
+- TypeScript: 21 unit/contract tests, including preparation/activation separation, integrity, streaming limits, cancellation, deadline, shared leases, intent dwell/grace, MIME checks, generated-glue ownership, cache bounds and immutable extensions.
+- Rust: 9 package tests for actual build inspection, verified native execution, fuel/memory limits, cancellation, canonical policy origins, content-type checks, bad manifests and persistent file cache.
+- Flutter/Dart: 13 package tests plus static analysis, including embedded schema equality, integer-valued JSON numbers, immutable extensions, shared preparation leases, bounded activation handoff, optional deactivation, MIME checks, canonical origins and file-cache restart.
 - External test org: one 17-case JSON corpus consumed independently by the installed TypeScript, Rust and Dart packages, plus organization-specific transport implementations.
 - External Chromium: real wasm-bindgen 0.2.114-generated glue, a real Flutter 3.44.2 --wasm build with two embedded views sharing one engine, and CacheStorage surviving full document navigation. These are framework builds, not handwritten mock bootstraps.
 - Browser CSP permits WASM compilation without enabling JavaScript unsafe-eval.
@@ -22,6 +22,8 @@ Leptos and Dioxus expose generated-glue/launch extension points; there is no cla
 
 Browser routing fixtures provide deterministic HTTPS responses for real compiled application files; they do not prove CDN cache reuse or real TLS/network performance. Run cold/warm production measurements before adopting a speed claim.
 
+The [2026-09 audit record](audit-2026-09.md) and [pilot plan](pilot-plan.md) define the remaining real-browser, device, fallback and production-cohort gates. The package-local tests do not replace those integration checks.
+
 ## Project mapping and unresolved configuration
 
 - [GitHub main project](https://github.com/orgs/ores-wasm-loaders/projects/1)
@@ -32,4 +34,3 @@ Browser routing fixtures provide deterministic HTTPS responses for real compiled
 The Linear workspace rejected new issues because its free issue quota was exhausted. Each repository has a GitHub planning issue; GH-1 branches/PRs record this limitation instead of inventing DEN identifiers. Slack messages were not requested.
 
 Owned apex domains and concrete login application URLs were not provided. The Astro sites use the organizations' github.io addresses and include user-app/org-app integration guidance. Cloudflare DNS, cloud projects, database organizations and authentication applications were not invented or provisioned as part of this library delivery.
-

@@ -25,7 +25,9 @@ Each release has a schemaVersion, appId, immutable release ID, runtime, entrypoi
 
 Preparation fetches approved assets within byte and concurrency limits. It never imports JavaScript, invokes a bootstrap, starts WASM, hydrates an island, or mounts a Flutter view. Optional early compilation is explicit for raw WASM. Failed speculative fetching does not poison a later demand fetch.
 
-Demand activation uses one stable adapter object per immutable release and retained host. Successful activation is shared. TypeScript and Dart remember failed activation too: an adapter may already have changed the document or initialized a runtime. A deadline rejects the caller and signals cancellation; it cannot forcibly undo a non-cooperative callback. Application cleanup or document replacement must precede a deliberate restart.
+Preparation is a shared, reference-counted lease in the browser and Dart hosts. `prefetch` resolves a preparation outcome (`warmed`, `failed`, `cancelled` or `skipped`) so callers can measure speculation without treating it as startup. Releasing one lease does not cancel another. Page intent helpers use dwell and exit-grace windows and release unclaimed work on page lifecycle changes.
+
+Demand activation uses one stable adapter object per immutable release and retained host. Successful activation is shared. It claims an in-flight preparation job but joins it only for a bounded handoff (`activationJoinMs`, 50 ms by default); after that, normal demand loading proceeds. TypeScript and Dart remember failed activation too: an adapter may already have changed the document or initialized a runtime. A deadline rejects the caller and signals cancellation; it cannot forcibly undo a non-cooperative callback. Application cleanup or document replacement must precede a deliberate restart. `deactivate` invokes optional adapter cleanup and releases the owner before a deliberate restart.
 
 Custom transports and stores must honor cancellation, bound their own allocations and complete their operations. The built-in fetch transports enforce streaming bounds. A native Rust blocking read observes cancellation between reads and is also bounded by its HTTP timeout.
 
@@ -55,5 +57,4 @@ A retained same-document host can preserve a compiled module or engine. Full nav
 
 Hash validation protects assets read through the coordinator. A subsequent dynamic import has a separate trust path: the host must pin generated glue and its transitive imports using immutable deployment URLs, CSP, and supported import-map integrity. Flutter bootstrap loading uses script integrity, but framework subresources still require a trusted, internally consistent build and delivery configuration.
 
-Default HTTP transports disallow redirects and public-asset credentials. Origin allowlists are exact, canonical origins, never suffix matches. Private authenticated bundles need an explicit transport policy and must not enter shared public caches. Extension hooks do not weaken those defaults.
-
+Default HTTP transports disallow redirects and public-asset credentials, require a content type appropriate to the manifest kind, and then verify the exact bytes. Origin allowlists are exact, canonical origins, never suffix matches. Private authenticated bundles need an explicit transport policy and must not enter shared public caches. Extension hooks do not weaken those defaults.
