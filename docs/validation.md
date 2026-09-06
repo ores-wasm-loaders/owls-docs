@@ -4,9 +4,9 @@ Preview v0.1.1 is source-reviewed, locally tested, and distributed through immut
 
 ## Automated coverage
 
-- TypeScript: 21 unit/contract tests, including preparation/activation separation, integrity, streaming limits, cancellation, deadline, shared leases, intent dwell/grace, MIME checks, generated-glue ownership, cache bounds and immutable extensions.
+- TypeScript: 22 unit/contract tests, including preparation/activation separation, integrity, streaming limits, cancellation, deadline, shared leases, intent dwell/grace, MIME checks, malformed URL handling, generated-glue ownership, cache bounds and immutable extensions.
 - Rust: 9 package tests for actual build inspection, verified native execution, fuel/memory limits, cancellation, canonical policy origins, content-type checks, bad manifests and persistent file cache.
-- Flutter/Dart: 13 package tests plus static analysis, including embedded schema equality, integer-valued JSON numbers, immutable extensions, shared preparation leases, bounded activation handoff, optional deactivation, MIME checks, canonical origins and file-cache restart.
+- Flutter/Dart: 14 package tests plus static analysis, including embedded schema equality, integer-valued JSON numbers, immutable extensions, shared preparation leases, bounded activation handoff, optional deactivation, MIME checks, canonical origins, malformed URL handling and file-cache restart.
 - External test org: one 17-case JSON corpus consumed independently by the installed TypeScript, Rust and Dart packages, plus organization-specific transport implementations.
 - External Chromium: real wasm-bindgen 0.2.114-generated glue, a real Flutter 3.44.2 --wasm build with two embedded views sharing one engine, and CacheStorage surviving full document navigation. These are framework builds, not handwritten mock bootstraps.
 - Browser CSP permits WASM compilation without enabling JavaScript unsafe-eval.
