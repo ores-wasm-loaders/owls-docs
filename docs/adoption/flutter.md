@@ -16,7 +16,7 @@ owls-manifest generate \
   --cross-origin-isolated \
   --write
 
-owls-manifest verify --dir build/web    # CI gate
+Validate the result with `owls-interfaces` in CI; a manifest that disagrees with its build fails there.
 ```
 
 The tool recognizes Flutter's own output names (`flutter_bootstrap.js`, `main.dart.wasm`,

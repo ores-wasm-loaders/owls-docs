@@ -14,10 +14,10 @@ shows up in a browser rather than in CI.
 
 ## Decision
 
-`owls-runtime.rs` reads the actual build directory, hashes every file, classifies roles
+`owls-runtime::inspect_build` reads the actual build directory, hashes every file, classifies roles
 from what is there (Flutter by its own toolchain names; wasm-bindgen structurally, by
 `<name>_bg.wasm` beside `<name>.js`), and derives the preparation budget from the real sizes.
-`owls-manifest verify` re-checks a manifest against the tree: a missing file, a changed digest,
+The public validator in `owls-interfaces` re-checks a manifest against the tree: a missing file, a changed digest,
 an unlisted file or a mutable release path is an error.
 
 Ambiguity is an error, not a guess: two candidate modules, or glue missing beside a module,
